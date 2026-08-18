@@ -319,6 +319,50 @@ input[type="range"]::-webkit-slider-runnable-track {
   gap: 0.5rem;
 }
 
+.media-controls {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.5rem;
+  background: rgba(10, 10, 11, 0.8);
+  backdrop-filter: blur(8px);
+  padding: 0.5rem;
+  border-radius: 2rem;
+  border: 1px solid rgba(255,255,255,0.1);
+  z-index: 20;
+  transition: opacity 0.3s;
+}
+
+.media-controls.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.control-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.control-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.control-btn.muted {
+  background: rgba(239, 68, 68, 0.8);
+  color: white;
+}
+
 /* Accordions (Details/Summary) */
 details.panel {
   padding: 0;

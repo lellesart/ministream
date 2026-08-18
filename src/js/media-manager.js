@@ -171,6 +171,26 @@ export class MediaManager {
     this.emit('stream-changed', this.currentStream);
   }
 
+  toggleAudio() {
+    if (!this.rawStream) return false;
+    const track = this.rawStream.getAudioTracks()[0];
+    if (track) {
+      track.enabled = !track.enabled;
+      return track.enabled;
+    }
+    return false;
+  }
+
+  toggleVideo() {
+    if (!this.rawStream) return false;
+    const track = this.rawStream.getVideoTracks()[0];
+    if (track) {
+      track.enabled = !track.enabled;
+      return track.enabled;
+    }
+    return false;
+  }
+
   stopCurrentStream() {
     if (this.rawStream) {
       this.rawStream.getTracks().forEach(track => track.stop());
