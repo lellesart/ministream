@@ -187,6 +187,10 @@ export class WebRTCEngine {
       });
       // Apply the current quality setting to the newly added video track
       this.applyVideoQualityToPeer(pc);
+    } else {
+      // Explicitly add transceivers to ensure we receive media even if not sending
+      pc.addTransceiver('video', { direction: 'recvonly' });
+      pc.addTransceiver('audio', { direction: 'recvonly' });
     }
 
     this.peerConnections.set(peerId, pc);
