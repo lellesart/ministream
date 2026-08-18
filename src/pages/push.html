@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mini stream - Push</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/css/design-system.css">
+  
+  <!-- MediaPipe for AI Background Removal -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
+  <style>
+    .video-container {
+      position: relative;
+      background: #000;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+      aspect-ratio: 16 / 9;
+      border: 1px solid var(--border-subtle);
+      box-shadow: inset 0 0 40px rgba(0,0,0,0.5);
+    }
+    video { width: 100%; height: 100%; object-fit: contain; }
+    
+    .status-badge {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      backdrop-filter: blur(4px);
+    }
+    
+    .view-link { 
+      background: var(--surface-2); 
+      padding: 1rem; 
+      border-radius: var(--radius-sm); 
+      border: 1px solid var(--border-subtle);
+      word-break: break-all;
+      margin-top: 1.5rem;
+      font-family: monospace;
+    }
+    
+    .view-link a { color: var(--accent-blue); text-decoration: none; }
+    .view-link a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container" style="max-width: 1200px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+      <div style="display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;">
+        <h1 style="margin: 0;">Lobby</h1>
+        <button id="copyInviteBtn" class="btn btn-primary" style="padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+          <span id="copyInviteText">Copiar Convite</span>
+        </button>
+      </div>
+      <a href="/" class="btn btn-secondary" style="padding: 0.5rem 1rem;">Sair da Sala</a>
+    </div>
+    
+    <div class="layout-split">
+      <div class="layout-left">
+        <div id="videoGrid" class="video-grid" style="margin-bottom: 1.5rem;">
+          <div class="video-wrapper main-video" id="localVideoWrapper">
+            <div id="statusText" class="badge red status-badge" style="top: 1rem; left: 1rem; z-index: 10;">Desconectado</div>
+            <video id="localVideo" autoplay muted playsinline></video>
+            
+            <div class="video-label" style="z-index: 10;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+              <span>Você</span>
+            </div>
+            
+            <div id="videoOverlay" class="video-overlay">
+              <svg id="videoOverlayIcon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+              </svg>
+              <div id="videoOverlayText">Aguardando câmera</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="panel" style="display: none;" id="linkContainer">
+          <h2>Link de Compartilhamento</h2>
+          <p>Envie este link para os visualizadores ou cole como Browser Source no OBS.</p>
+          <div class="view-link">
+            <a href="#" id="viewUrl" target="_blank"></a>
+          </div>
+        </div>
+        
+        <div id="statsContainer" class="panel" style="display: none;">
+          <h2 style="font-size: 1rem; margin-bottom: 1rem;">Estatísticas de Conexão</h2>
+          <div id="statsContent" style="font-family: monospace; font-size: 0.875rem; color: var(--text-muted);"></div>
+        </div>
+      </div>
+      
+      <div class="layout-right">
+        <div class="panel" style="margin-bottom: 0;">
+          <h2>Configurações de Origem</h2>
+          
+          <div class="input-group">
+            <label for="videoSource">Câmera</label>
+            <select id="videoSource"><option value="">Câmera Padrão</option></select>
+          </div>
+          
+          <div class="input-group">
+            <label for="audioSource">Microfone</label>
+            <select id="audioSource"><option value="">Microfone Padrão</option></select>
+          </div>
+          
+          <div class="input-group">
+            <label for="videoQuality">Qualidade de Vídeo</label>
+            <select id="videoQuality">
+              <option value="high">Alta (1080p, Bitrate Alto)</option>
+              <option value="normal" selected>Normal (720p, Balanceado)</option>
+              <option value="low">Baixa (720p/540p, Bitrate Baixo)</option>
+            </select>
+          </div>
+          
+          <div class="input-group">
+            <label for="bufferControl">Buffer do Receptor</label>
+            <select id="bufferControl">
+              <option value="obs" selected>Deixar o OBS gerenciar (Padrão)</option>
+              <option value="0">0ms (Menor Latência, sujeito a quedas)</option>
+              <option value="200">200ms (Estável)</option>
+              <option value="500">500ms (Muito Estável)</option>
+            </select>
+          </div>
+          
+          <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1.5rem;">
+            <button id="startBtn" class="btn btn-primary" style="padding: 0.75rem;">Iniciar Câmera</button>
+            <button id="audioOnlyBtn" class="btn btn-primary" style="padding: 0.75rem;">Somente Áudio</button>
+            <button id="screenBtn" class="btn btn-secondary" style="padding: 0.75rem;">Compartilhar Tela</button>
+          </div>
+        </div>
+        
+        <details class="panel" style="margin-bottom: 0;">
+          <summary>Ajustes de Vídeo e Efeitos</summary>
+          <div class="details-content">
+            <div style="background: rgba(239, 68, 68, 0.1); border-left: 2px solid var(--accent-red); padding: 0.5rem; margin-bottom: 1rem; border-radius: 2px;">
+              <p class="caption" style="color: var(--text-main); margin: 0;">Aviso: Usar múltiplos efeitos pesados simultaneamente (ex: Chroma Key + IA) exige muito do processador.</p>
+            </div>
+
+            <div class="input-group">
+              <label style="display: flex; justify-content: space-between;">
+                Zoom <span id="zoomLabel">1.0x</span>
+              </label>
+              <input type="range" id="zoomSlider" min="1" max="3" step="0.1" value="1">
+            </div>
+            
+            <div class="input-group">
+              <label style="display: flex; justify-content: space-between;">
+                Brilho <span id="brightnessLabel">100%</span>
+              </label>
+              <input type="range" id="brightnessSlider" min="0" max="200" step="5" value="100">
+            </div>
+
+            <div class="input-group">
+              <label style="display: flex; justify-content: space-between;">
+                Contraste <span id="contrastLabel">100%</span>
+              </label>
+              <input type="range" id="contrastSlider" min="0" max="200" step="5" value="100">
+            </div>
+            
+            <div class="input-group">
+              <label style="display: flex; justify-content: space-between;">
+                Suavização de Rosto <span id="blurLabel">0</span>
+              </label>
+              <input type="range" id="blurSlider" min="0" max="10" step="1" value="0">
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem;">
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; font-weight: 500; cursor: pointer;">
+                <input type="checkbox" id="mirrorToggle"> Espelhar Câmera Horizontalmente
+              </label>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-subtle);">
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; font-weight: 500; cursor: pointer;">
+                <input type="checkbox" id="aiBackgroundToggle"> Remover Fundo por Inteligência Artificial
+              </label>
+              <p class="caption" style="margin-left: 1.5rem;">Utiliza a webcam para recortar você sem precisar de tela verde. Na primeira vez, baixará ~3MB da IA do Google.</p>
+              <div id="customBgContainer" style="display: none; margin-left: 1.5rem; margin-top: 0.5rem;">
+                <label style="font-size: 0.875rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Adicionar novo fundo (Imagem)</label>
+                <input type="file" id="customBgInput" accept="image/*" style="font-size: 0.75rem; color: var(--text-muted);">
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-subtle);">
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; font-weight: 500; cursor: pointer;">
+                <input type="checkbox" id="chromaToggle"> Chroma Key (Tela Verde/Azul)
+              </label>
+              <div id="chromaControls" style="display: none; flex-direction: column; gap: 1rem; margin-top: 1rem; margin-left: 1.5rem;">
+                <div class="input-group" style="margin-bottom: 0;">
+                  <label>Cor a ser removida</label>
+                  <input type="color" id="chromaColor" value="#00ff00" style="width: 100%; height: 40px; background: none; border: none; cursor: pointer; padding: 0;">
+                </div>
+                <div class="input-group" style="margin-bottom: 0;">
+                  <label style="display: flex; justify-content: space-between;">
+                    Tolerância <span id="chromaSimLabel">10%</span>
+                  </label>
+                  <input type="range" id="chromaSimSlider" min="0" max="0.5" step="0.01" value="0.1">
+                </div>
+                <div class="input-group" style="margin-bottom: 0;">
+                  <label style="display: flex; justify-content: space-between;">
+                    Suavidade das Bordas <span id="chromaSmoothLabel">10%</span>
+                  </label>
+                  <input type="range" id="chromaSmoothSlider" min="0" max="0.5" step="0.01" value="0.1">
+                </div>
+              </div>
+            </div>
+          </div>
+        </details>
+        
+        <details class="panel" style="margin-bottom: 0;">
+          <summary>Controles de Áudio</summary>
+          <div class="details-content">
+            <div class="input-group">
+              <label style="display: flex; justify-content: space-between;">
+                Volume <span id="volumeLabel">100%</span>
+              </label>
+              <input type="range" id="volumeSlider" min="0" max="2" step="0.1" value="1">
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem;">
+              <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem;">
+                <button id="muteBtn" class="btn btn-secondary">Mutar</button>
+              </div>
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--text-muted); cursor: pointer;">
+                <input type="checkbox" id="echoToggle" checked> Cancelamento de Eco (Hardware)
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--text-muted); cursor: pointer;">
+                <input type="checkbox" id="agcToggle" checked> Controle Automático de Ganho (Hardware)
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--text-muted); cursor: pointer;">
+                <input type="checkbox" id="noiseToggle"> Supressão de Ruído (Software)
+              </label>
+            </div>
+            
+            <div>
+              <label style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 0.5rem; display: block;">Nível de Entrada (VU)</label>
+              <div style="width: 100%; height: 8px; background: var(--bg-color); border-radius: 4px; overflow: hidden; border: 1px solid var(--border-subtle);">
+                <div id="vuMeter" style="width: 0%; height: 100%; background: var(--accent-green); transition: width 0.1s, background-color 0.2s;"></div>
+              </div>
+            </div>
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+
+
+  <script type="module">
+    import { SignalingClient } from '../js/signaling-client.js';
+    import { WebRTCEngine } from '../js/webrtc-engine.js';
+    import { MediaManager } from '../js/media-manager.js';
+    import { StatsMonitor } from '../js/stats-monitor.js';
+
+    // Get room ID from URL or generate one
+    const urlParams = new URLSearchParams(window.location.search);
+    let roomId = urlParams.get('room');
+    if (!roomId) {
+      roomId = Math.random().toString(36).substring(2, 10);
+      window.history.replaceState({}, '', `?room=${roomId}`);
+    }
+
+    const signaling = new SignalingClient();
+    const rtcEngine = new WebRTCEngine(signaling);
+    const mediaManager = new MediaManager(rtcEngine);
+    
+    const localVideo = document.getElementById('localVideo');
+    const statusText = document.getElementById('statusText');
+    const linkContainer = document.getElementById('linkContainer');
+    const viewUrl = document.getElementById('viewUrl');
+    const videoSource = document.getElementById('videoSource');
+    const audioSource = document.getElementById('audioSource');
+    const videoGrid = document.getElementById('videoGrid');
+
+    const bufferControl = document.getElementById('bufferControl');
+    function updateViewUrl() {
+      let url = `${window.location.origin}/src/pages/view.html?room=${roomId}`;
+      if (bufferControl.value !== 'obs') {
+        url += `&buffer=${bufferControl.value}`;
+      }
+      viewUrl.href = url;
+      viewUrl.textContent = url;
+    }
+    
+    // Copy Invite Logic
+    const copyInviteBtn = document.getElementById('copyInviteBtn');
+    const copyInviteText = document.getElementById('copyInviteText');
+    copyInviteBtn.addEventListener('click', async () => {
+      try {
+        const inviteUrl = window.location.href; // The current push.html?room=XYZ url
+        await navigator.clipboard.writeText(inviteUrl);
+        
+        // Visual feedback
+        const originalText = copyInviteText.textContent;
+        copyInviteText.textContent = 'Copiado!';
+        copyInviteBtn.classList.replace('btn-primary', 'btn-secondary');
+        
+        setTimeout(() => {
+          copyInviteText.textContent = originalText;
+          copyInviteBtn.classList.replace('btn-secondary', 'btn-primary');
+        }, 2000);
+      } catch (err) {
+        console.error('Failed to copy', err);
+        alert('Não foi possível copiar o link. Copie a URL da barra do navegador.');
+      }
+    });
+
+    // Initial call
+    updateViewUrl();
+    linkContainer.style.display = 'block';
+
+    bufferControl.addEventListener('change', updateViewUrl);
+
+    // Create or get video element for a peer
+    function getOrCreateVideoElement(peerId) {
+      let wrapper = document.getElementById(`wrapper-${peerId}`);
+      if (!wrapper) {
+        wrapper = document.createElement('div');
+        wrapper.id = `wrapper-${peerId}`;
+        wrapper.className = 'video-wrapper';
+        
+        const video = document.createElement('video');
+        video.id = `video-${peerId}`;
+        video.autoplay = true;
+        video.playsInline = true;
+        // Not muted so participants can hear each other in the lobby
+        
+        const label = document.createElement('div');
+        label.className = 'video-label';
+        label.innerHTML = `
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+          <span>Convidado</span>
+        `;
+
+        wrapper.appendChild(video);
+        wrapper.appendChild(label);
+        videoGrid.appendChild(wrapper);
+      }
+      return document.getElementById(`video-${peerId}`);
+    }
+
+    rtcEngine.on('track-received', ({ peerId, track, stream }) => {
+      console.log('Track received from', peerId, track.kind);
+      const videoElement = getOrCreateVideoElement(peerId);
+      if (videoElement.srcObject !== stream) {
+        videoElement.srcObject = stream;
+      }
+    });
+
+    rtcEngine.on('peer-disconnected', (peerId) => {
+      console.log('Peer disconnected:', peerId);
+      const wrapper = document.getElementById(`wrapper-${peerId}`);
+      if (wrapper) {
+        wrapper.remove();
+      }
+    });
+
+    signaling.on('peer-connected', () => {
+      statusText.textContent = 'Conectado à sala!';
+      setTimeout(() => {
+        if(statusText.textContent === 'Conectado à sala!') statusText.style.display = 'none';
+      }, 3000);
+    });
+
+    mediaManager.on('stream-changed', (stream) => {
+      localVideo.srcObject = stream;
+    });
+
+    async function populateDevices() {
+      const { cameras, microphones } = await mediaManager.enumerateDevices();
+      
+      videoSource.innerHTML = '<option value="">Default Camera</option>';
+      cameras.forEach(device => {
+        const option = document.createElement('option');
+        option.value = device.deviceId;
+        option.text = device.label || `Camera ${videoSource.length}`;
+        videoSource.appendChild(option);
+      });
+
+      audioSource.innerHTML = '<option value="">Default Microphone</option>';
+      microphones.forEach(device => {
+        const option = document.createElement('option');
+        option.value = device.deviceId;
+        option.text = device.label || `Microphone ${audioSource.length}`;
+        audioSource.appendChild(option);
+      });
+    }
+
+    // Ask for initial permission to get device labels
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+        .then(stream => {
+          stream.getTracks().forEach(track => track.stop());
+          populateDevices();
+        }).catch(err => {
+          console.warn('Permission denied or error initially, labels may be missing.', err);
+          populateDevices();
+        });
+    } else {
+      console.error('navigator.mediaDevices is unavailable. WebRTC requires HTTPS or localhost.');
+      document.getElementById('statusText').textContent = 'Error: Camera requires HTTPS or localhost.';
+    }
+
+
+    videoSource.addEventListener('change', async () => {
+      if (mediaManager.currentStream && mediaManager.currentStream.getVideoTracks().length > 0) {
+        await mediaManager.switchCamera(videoSource.value);
+      }
+    });
+
+    audioSource.addEventListener('change', async () => {
+      if (mediaManager.currentStream && mediaManager.currentStream.getAudioTracks().length > 0) {
+        await mediaManager.switchMicrophone(audioSource.value);
+      }
+    });
+
+    const videoQuality = document.getElementById('videoQuality');
+    videoQuality.addEventListener('change', async () => {
+      await rtcEngine.setVideoQuality(videoQuality.value);
+    });
+
+    function getAudioOptions() {
+      return {
+        echoCancellation: document.getElementById('echoToggle').checked,
+        autoGainControl: document.getElementById('agcToggle').checked,
+        noiseSuppression: document.getElementById('noiseToggle').checked
+      };
+    }
+
+    document.getElementById('startBtn').addEventListener('click', async () => {
+      try {
+        await mediaManager.startCamera(videoSource.value, audioSource.value, getAudioOptions());
+        
+        if (!signaling.ws) {
+          await signaling.connect(roomId, 'sender');
+        }
+        statusText.textContent = 'Conectado à sala, aguardando visualizadores...';
+      } catch (err) {
+        console.error('Error accessing media devices.', err);
+        statusText.textContent = 'Error: ' + err.message;
+      }
+    });
+
+    document.getElementById('audioOnlyBtn').addEventListener('click', async () => {
+      try {
+        const options = getAudioOptions();
+        options.audioOnly = true;
+        await mediaManager.startCamera(videoSource.value, audioSource.value, options);
+        
+        if (!signaling.ws) {
+          await signaling.connect(roomId, 'sender');
+        }
+        statusText.textContent = 'Transmitindo Somente Áudio...';
+      } catch (err) {
+        console.error('Error accessing audio devices.', err);
+        statusText.textContent = 'Error: ' + err.message;
+      }
+    });
+
+    document.getElementById('screenBtn').addEventListener('click', async () => {
+      try {
+        await mediaManager.startScreenShare(true);
+        
+        if (!signaling.ws) {
+            await signaling.connect(roomId, 'sender');
+        }
+        statusText.textContent = 'Compartilhando tela, aguardando visualizadores...';
+      } catch (err) {
+        console.error('Error sharing screen.', err);
+      }
+    });
+
+    // Stats Monitor
+    const statsMonitor = new StatsMonitor(rtcEngine);
+    const statsContentDiv = document.getElementById('statsContent');
+    const statsContainerDiv = document.getElementById('statsContainer');
+
+    statsMonitor.on('stats-updated', ({ peerId, stats }) => {
+      statsContainerDiv.style.display = 'block';
+      statsContentDiv.innerHTML = `
+        <div><strong>Peer:</strong> ${peerId.substring(0, 8)}...</div>
+        <div><strong>Vídeo (Bitrate):</strong> ${stats.videoBitrate} kbps</div>
+        <div><strong>Áudio (Bitrate):</strong> ${stats.audioBitrate} kbps</div>
+        <div><strong>Ping (RTT):</strong> ${stats.rtt} ms</div>
+        <div><strong>Perda de Pacotes:</strong> ${stats.packetLoss}</div>
+      `;
+    });
+    statsMonitor.start(2000);
+
+    // Video Effects Controls
+    const zoomSlider = document.getElementById('zoomSlider');
+    const brightnessSlider = document.getElementById('brightnessSlider');
+    const contrastSlider = document.getElementById('contrastSlider');
+    const blurSlider = document.getElementById('blurSlider');
+    const mirrorToggle = document.getElementById('mirrorToggle');
+    const aiBackgroundToggle = document.getElementById('aiBackgroundToggle');
+    const customBgContainer = document.getElementById('customBgContainer');
+    const customBgInput = document.getElementById('customBgInput');
+    const chromaToggle = document.getElementById('chromaToggle');
+    const chromaControls = document.getElementById('chromaControls');
+    const chromaColor = document.getElementById('chromaColor');
+    const chromaSimSlider = document.getElementById('chromaSimSlider');
+    const chromaSmoothSlider = document.getElementById('chromaSmoothSlider');
+    
+    // UI Overlays
+    const videoOverlay = document.getElementById('videoOverlay');
+    const videoOverlayText = document.getElementById('videoOverlayText');
+    const videoOverlayIcon = document.getElementById('videoOverlayIcon');
+
+    // Error Handling Overlay
+    mediaManager.on('media-error', (err) => {
+      videoOverlay.classList.remove('hidden');
+      if (err.name === 'NotAllowedError') {
+        videoOverlayIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>';
+        videoOverlayText.textContent = 'Permissão de câmera negada. Libere no cadeado do navegador.';
+      } else if (err.name === 'NotFoundError') {
+        videoOverlayIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>';
+        videoOverlayText.textContent = 'Câmera não encontrada.';
+      }
+    });
+
+    // AI Loading Overlay
+    window.addEventListener('ai-loading-start', () => {
+      videoOverlay.classList.remove('hidden');
+      videoOverlayIcon.innerHTML = '<div class="loader"></div>';
+      videoOverlayText.textContent = 'Carregando filtro de IA...';
+    });
+
+    window.addEventListener('ai-loading-end', () => {
+      videoOverlay.classList.add('hidden');
+    });
+
+    // We should hide the overlay when camera actually starts
+    const originalHandleNewStream = mediaManager.handleNewStream.bind(mediaManager);
+    mediaManager.handleNewStream = (stream) => {
+      videoOverlay.classList.add('hidden');
+      originalHandleNewStream(stream);
+    };
+
+    zoomSlider.addEventListener('input', (e) => {
+      document.getElementById('zoomLabel').textContent = `${parseFloat(e.target.value).toFixed(1)}x`;
+      mediaManager.videoProcessor.updateConfig({ zoom: parseFloat(e.target.value) });
+    });
+    
+    brightnessSlider.addEventListener('input', (e) => {
+      document.getElementById('brightnessLabel').textContent = `${e.target.value}%`;
+      mediaManager.videoProcessor.updateConfig({ brightness: parseInt(e.target.value) });
+    });
+
+    contrastSlider.addEventListener('input', (e) => {
+      document.getElementById('contrastLabel').textContent = `${e.target.value}%`;
+      mediaManager.videoProcessor.updateConfig({ contrast: parseInt(e.target.value) });
+    });
+
+    blurSlider.addEventListener('input', (e) => {
+      document.getElementById('blurLabel').textContent = e.target.value;
+      mediaManager.videoProcessor.updateConfig({ blur: parseInt(e.target.value) });
+    });
+    
+    mirrorToggle.addEventListener('change', (e) => {
+      mediaManager.videoProcessor.updateConfig({ mirror: e.target.checked });
+    });
+
+    aiBackgroundToggle.addEventListener('change', (e) => {
+      mediaManager.videoProcessor.updateConfig({ aiBackground: e.target.checked });
+      customBgContainer.style.display = e.target.checked ? 'block' : 'none';
+      if(e.target.checked) {
+        chromaToggle.checked = false;
+        chromaControls.style.display = 'none';
+        mediaManager.videoProcessor.updateConfig({ chromaKey: { ...mediaManager.videoProcessor.config.chromaKey, enabled: false } });
+      }
+    });
+
+    customBgInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      mediaManager.videoProcessor.setCustomBackground(file);
+    });
+
+    chromaToggle.addEventListener('change', (e) => {
+      chromaControls.style.display = e.target.checked ? 'flex' : 'none';
+      mediaManager.videoProcessor.updateConfig({ chromaKey: { ...mediaManager.videoProcessor.config.chromaKey, enabled: e.target.checked } });
+      // If we enable chroma, we can also show the custom bg container
+      customBgContainer.style.display = e.target.checked ? 'block' : 'none';
+      
+      if(e.target.checked) {
+        aiBackgroundToggle.checked = false;
+        mediaManager.videoProcessor.updateConfig({ aiBackground: false });
+      }
+    });
+
+    chromaColor.addEventListener('input', (e) => {
+      mediaManager.videoProcessor.setChromaColor(e.target.value);
+    });
+
+    chromaSimSlider.addEventListener('input', (e) => {
+      document.getElementById('chromaSimLabel').textContent = `${Math.round(e.target.value * 100)}%`;
+      mediaManager.videoProcessor.updateConfig({ chromaKey: { ...mediaManager.videoProcessor.config.chromaKey, similarity: parseFloat(e.target.value) } });
+    });
+
+    chromaSmoothSlider.addEventListener('input', (e) => {
+      document.getElementById('chromaSmoothLabel').textContent = `${Math.round(e.target.value * 100)}%`;
+      mediaManager.videoProcessor.updateConfig({ chromaKey: { ...mediaManager.videoProcessor.config.chromaKey, smoothness: parseFloat(e.target.value) } });
+    });
+
+    // Audio Controls
+    const volumeSlider = document.getElementById('volumeSlider');
+    const muteBtn = document.getElementById('muteBtn');
+    const noiseToggle = document.getElementById('noiseToggle');
+    const vuMeter = document.getElementById('vuMeter');
+
+    volumeSlider.addEventListener('input', (e) => {
+      mediaManager.audioProcessor.setVolume(parseFloat(e.target.value));
+    });
+
+    muteBtn.addEventListener('click', () => {
+      const isMuted = mediaManager.audioProcessor.toggleMute();
+      muteBtn.textContent = isMuted ? 'Unmute' : 'Mute';
+      muteBtn.style.background = isMuted ? '#EF4444' : '#4B5563';
+    });
+
+    noiseToggle.addEventListener('change', (e) => {
+      mediaManager.audioProcessor.enableNoiseSuppression(e.target.checked);
+    });
+
+    // VU Meter Loop
+    function updateVuMeter() {
+      const level = mediaManager.audioProcessor.getVolumeLevel();
+      vuMeter.style.width = `${level * 100}%`;
+      
+      // Color change based on level
+      if (level > 0.8) {
+        vuMeter.style.background = '#EF4444'; // Red
+      } else if (level > 0.5) {
+        vuMeter.style.background = '#F59E0B'; // Yellow
+      } else {
+        vuMeter.style.background = '#10B981'; // Green
+      }
+
+      requestAnimationFrame(updateVuMeter);
+    }
+    requestAnimationFrame(updateVuMeter);
+  </script>
+</body>
+</html>

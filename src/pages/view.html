@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mini stream - View</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/css/design-system.css">
+  <style>
+    body { 
+      font-family: var(--font-family); 
+      background-color: #000; 
+      color: var(--text-main); 
+      margin: 0; 
+      padding: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    /* OBS transparent mode */
+    body.obs-mode {
+      background-color: transparent !important;
+    }
+    
+    .container { 
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      max-width: none;
+    }
+
+    video { 
+      width: 100%; 
+      height: 100%;
+      object-fit: contain;
+      background: transparent; 
+    }
+
+    .overlay {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(12px);
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(255,255,255,0.06);
+      z-index: 10;
+      font-size: 0.875rem;
+    }
+    body.obs-mode .overlay {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="overlay" id="statusOverlay">Conectando...</div>
+  <div class="container" style="padding: 1rem;">
+    <div id="gridContainer" class="video-grid">
+      <!-- Videos will be added here dynamically -->
+    </div>
+  </div>
+
+  <script type="module">
+    import { SignalingClient } from '../js/signaling-client.js';
+    import { WebRTCEngine } from '../js/webrtc-engine.js';
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomId = urlParams.get('room');
+    const isObsMode = urlParams.has('obs');
+    const bufferParam = urlParams.get('buffer');
+
+    if (isObsMode) {
+      document.body.classList.add('obs-mode');
+      document.querySelector('.container').style.padding = '0'; // Remove padding for OBS
+    }
+
+    const gridContainer = document.getElementById('gridContainer');
+    const statusOverlay = document.getElementById('statusOverlay');
+
+    if (!roomId) {
+      statusOverlay.textContent = 'Erro: Nenhum ID de sala fornecido';
+    } else {
+      const signaling = new SignalingClient();
+      const rtcEngine = new WebRTCEngine(signaling);
+
+      // Create or get video element for a peer
+      function getOrCreateVideoElement(peerId) {
+        let wrapper = document.getElementById(`wrapper-${peerId}`);
+        if (!wrapper) {
+          wrapper = document.createElement('div');
+          wrapper.id = `wrapper-${peerId}`;
+          wrapper.className = 'video-wrapper';
+          
+          const video = document.createElement('video');
+          video.id = `video-${peerId}`;
+          video.autoplay = true;
+          video.playsInline = true;
+          
+          const label = document.createElement('div');
+          label.className = 'video-label';
+          label.innerHTML = `
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+            <span>Convidado</span>
+          `;
+
+          wrapper.appendChild(video);
+          wrapper.appendChild(label);
+          gridContainer.appendChild(wrapper);
+        }
+        return document.getElementById(`video-${peerId}`);
+      }
+
+      rtcEngine.on('track-received', ({ peerId, track, stream }) => {
+        console.log('Track received from', peerId, track.kind);
+        const videoElement = getOrCreateVideoElement(peerId);
+        if (videoElement.srcObject !== stream) {
+          videoElement.srcObject = stream;
+        }
+        if (bufferParam !== null && bufferParam !== 'obs') {
+          const delay = parseFloat(bufferParam) / 1000.0;
+          rtcEngine.setPlayoutDelay(delay);
+        }
+      });
+
+      rtcEngine.on('peer-disconnected', (peerId) => {
+        console.log('Peer disconnected:', peerId);
+        const wrapper = document.getElementById(`wrapper-${peerId}`);
+        if (wrapper) {
+          wrapper.remove();
+        }
+      });
+
+      rtcEngine.on('peer-connected', () => {
+        statusOverlay.textContent = 'Conectado';
+        setTimeout(() => statusOverlay.style.display = 'none', 3000);
+      });
+
+      // Start connection
+      signaling.connect(roomId, 'viewer').catch(err => {
+        statusOverlay.textContent = 'Erro de conexão: ' + err.message;
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mini stream - Lobby</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/css/design-system.css">
+  <style>
+    .hero {
+      text-align: center;
+      padding: 4rem 0 2rem 0;
+    }
+
+    .hero-title {
+      font-size: 3rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 0.5rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin-top: 2rem;
+    }
+
+    .feature-list {
+      list-style: none;
+      padding: 0;
+      margin: 1rem 0;
+    }
+
+    .feature-list li {
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text-muted);
+    }
+
+    .feature-list li::before {
+      content: '✓';
+      color: var(--accent-green);
+      font-weight: bold;
+    }
+
+    .join-container {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .join-container input {
+      flex: 1;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="hero">
+      <h1 class="hero-title">mini stream</h1>
+      <p style="font-size: 1.25rem;">Compartilhamento de Mídia WebRTC Corporativo</p>
+    </div>
+
+    <div class="grid">
+      <!-- Create Room Panel -->
+      <div class="panel">
+        <h2>Criar uma Sala</h2>
+        <p>Inicie uma nova sessão temporária para transmitir sua câmera, tela ou áudio.</p>
+
+        <ul class="feature-list">
+          <li>Conexão P2P de Baixa Latência</li>
+          <li>Troca Dinâmica de Dispositivos</li>
+          <li>Controles Avançados de Áudio</li>
+          <li>Integração com OBS Browser Source</li>
+        </ul>
+
+        <button id="createBtn" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
+          Gerar Link de Transmissão
+        </button>
+      </div>
+
+      <!-- Join Room Panel -->
+      <div class="panel">
+        <h2>Entrar como Convidado</h2>
+        <p>Insira um ID de sala para ligar sua câmera, interagir com os outros convidados e participar da transmissão no OBS.</p>
+
+        <div class="input-group" style="margin-top: 1.5rem;">
+          <label for="roomIdInput">ID da Sala</label>
+          <div class="join-container">
+            <input type="text" id="roomIdInput" placeholder="Ex: ab12cd34">
+            <button id="joinBtn" class="btn btn-secondary">Entrar</button>
+          </div>
+        </div>
+
+        <div style="margin-top: 2rem; border-top: 1px solid var(--panel-border); padding-top: 1.5rem;">
+          <h3 style="font-size: 1rem;">Como usar no OBS</h3>
+          <p style="font-size: 0.875rem;">1. Crie uma sala e copie o link VIEW (Visualização).</p>
+          <p style="font-size: 0.875rem;">2. Adicione uma Fonte de Navegador (Browser Source) no OBS.</p>
+          <p style="font-size: 0.875rem;">3. Cole o link e adicione <code>&obs=1</code> no final para ativar o modo
+            transparente sem interface.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('createBtn').addEventListener('click', () => {
+      const newRoomId = Math.random().toString(36).substring(2, 10);
+      window.location.href = `/src/pages/push.html?room=${newRoomId}`;
+    });
+
+    document.getElementById('joinBtn').addEventListener('click', () => {
+      const roomId = document.getElementById('roomIdInput').value.trim();
+      if (roomId) {
+        window.location.href = `/src/pages/push.html?room=${roomId}`;
+      } else {
+        alert('Por favor, insira um ID da Sala');
+      }
+    });
+  </script>
+</body>
+
+</html>
