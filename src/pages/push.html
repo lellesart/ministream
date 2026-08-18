@@ -48,14 +48,14 @@
 <body>
   <div class="container" style="max-width: 1200px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
-      <div style="display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;">
-        <h1 style="margin: 0;">Lobby</h1>
+      <h1 style="margin: 0;">Lobby</h1>
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
         <button id="copyInviteBtn" class="btn btn-primary" style="padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
           <span id="copyInviteText">Copiar Convite</span>
         </button>
+        <a href="/" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">Sair</a>
       </div>
-      <a href="/" class="btn btn-secondary" style="padding: 0.5rem 1rem;">Sair da Sala</a>
     </div>
     
     <div class="layout-split">
@@ -86,19 +86,6 @@
               </button>
             </div>
           </div>
-        </div>
-        
-        <div class="panel" style="display: none;" id="linkContainer">
-          <h2>Link de Compartilhamento</h2>
-          <p>Envie este link para os visualizadores ou cole como Browser Source no OBS.</p>
-          <div class="view-link">
-            <a href="#" id="viewUrl" target="_blank"></a>
-          </div>
-        </div>
-        
-        <div id="statsContainer" class="panel" style="display: none;">
-          <h2 style="font-size: 1rem; margin-bottom: 1rem;">Estatísticas de Conexão</h2>
-          <div id="statsContent" style="font-family: monospace; font-size: 0.875rem; color: var(--text-muted);"></div>
         </div>
       </div>
       
@@ -254,6 +241,19 @@
           </div>
         </details>
       </div>
+    </div>
+    
+    <div class="panel" style="display: none; margin-top: 1.5rem;" id="linkContainer">
+      <h2>Link de Compartilhamento</h2>
+      <p>Envie este link para os visualizadores ou cole como Browser Source no OBS.</p>
+      <div class="view-link">
+        <a href="#" id="viewUrl" target="_blank"></a>
+      </div>
+    </div>
+    
+    <div id="statsContainer" class="panel" style="display: none; margin-top: 1.5rem;">
+      <h2 style="font-size: 1rem; margin-bottom: 1rem;">Estatísticas de Conexão</h2>
+      <div id="statsContent" style="font-family: monospace; font-size: 0.875rem; color: var(--text-muted);"></div>
     </div>
   </div>
 
