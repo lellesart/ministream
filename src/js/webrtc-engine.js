@@ -8,11 +8,14 @@ export class WebRTCEngine {
     this.currentVideoQuality = 'normal';
     this.iceCandidateQueue = new Map(); // peerId -> RTCIceCandidate[]
     
-    // Default STUN servers
+    // Default STUN servers and open TURN relay for strict NATs
     this.iceServers = [
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun.cloudflare.com:3478' }
+      { urls: 'stun:stun.cloudflare.com:3478' },
+      { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
     ];
 
     this.setupSignalingListeners();
@@ -157,6 +160,16 @@ export class WebRTCEngine {
     console.log(`Creating peer connection for ${peerId}, initiator: ${isInitiator}`);
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
 
+    pc.onnegotiationneeded = async () => {
+      if (isInitiator) {
+        try {
+          await this.createAndSendOffer(peerId, pc);
+        } catch (err) {
+          console.error(`Error during negotiation with ${peerId}:`, err);
+        }
+      }
+    };
+
     pc.onicecandidate = (event) => {
       if (event.candidate) {
         this.signaling.sendIceCandidate(peerId, event.candidate);
@@ -165,9 +178,12 @@ export class WebRTCEngine {
 
     pc.oniceconnectionstatechange = () => {
       console.log(`ICE state for ${peerId}: ${pc.iceConnectionState}`);
-      if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
-        this.emit('peer-disconnected', peerId);
-      } else if (pc.iceConnectionState === 'connected') {
+      if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'closed') {
+        // Do not remove UI on 'disconnected' as it is often temporary.
+        // We rely on signaling 'peer-left' to cleanly remove peers.
+        // If it strictly fails, we could attempt an ICE restart here.
+        console.warn(`ICE connection failed for ${peerId}`);
+      } else if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
         this.emit('peer-connected', peerId);
       }
     };

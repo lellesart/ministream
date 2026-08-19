@@ -170,9 +170,9 @@
       rtcEngine.on('track-received', ({ peerId, track, stream }) => {
         console.log('Track received from', peerId, track.kind);
         const videoElement = getOrCreateVideoElement(peerId);
-        if (videoElement.srcObject !== stream) {
-          videoElement.srcObject = stream;
-        }
+        videoElement.srcObject = stream;
+        videoElement.play().catch(e => console.warn('Autoplay blocked:', e));
+        
         if (bufferParam !== null && bufferParam !== 'obs') {
           const delay = parseFloat(bufferParam) / 1000.0;
           rtcEngine.setPlayoutDelay(delay);
