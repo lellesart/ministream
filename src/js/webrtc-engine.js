@@ -6,6 +6,7 @@ export class WebRTCEngine {
     this.localStream = null;
     this.listeners = new Map();
     this.currentVideoQuality = 'normal';
+    this.iceCandidateQueue = new Map(); // peerId -> RTCIceCandidate[]
     
     // Default STUN servers
     this.iceServers = [
@@ -220,6 +221,7 @@ export class WebRTCEngine {
 
     try {
       await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+      await this.flushIceCandidates(peerId, pc);
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       this.signaling.sendAnswer(peerId, pc.localDescription);
@@ -237,6 +239,7 @@ export class WebRTCEngine {
 
     try {
       await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+      await this.flushIceCandidates(peerId, pc);
     } catch (err) {
       console.error(`Error handling answer from ${peerId}:`, err);
     }
@@ -244,8 +247,13 @@ export class WebRTCEngine {
 
   async handleIceCandidate(peerId, candidate) {
     const pc = this.peerConnections.get(peerId);
-    if (!pc) {
-      console.warn(`No peer connection for ${peerId} to handle ICE candidate`);
+    
+    // If no PC or remote description is not set yet, queue the candidate
+    if (!pc || !pc.remoteDescription || !pc.remoteDescription.type) {
+      if (!this.iceCandidateQueue.has(peerId)) {
+        this.iceCandidateQueue.set(peerId, []);
+      }
+      this.iceCandidateQueue.get(peerId).push(candidate);
       return;
     }
 
@@ -256,11 +264,26 @@ export class WebRTCEngine {
     }
   }
 
+  async flushIceCandidates(peerId, pc) {
+    if (this.iceCandidateQueue.has(peerId)) {
+      const candidates = this.iceCandidateQueue.get(peerId);
+      for (const candidate of candidates) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (err) {
+          console.error(`Error adding queued ICE candidate for ${peerId}:`, err);
+        }
+      }
+      this.iceCandidateQueue.delete(peerId);
+    }
+  }
+
   closePeerConnection(peerId) {
     const pc = this.peerConnections.get(peerId);
     if (pc) {
       pc.close();
       this.peerConnections.delete(peerId);
+      this.iceCandidateQueue.delete(peerId);
       this.emit('peer-disconnected', peerId);
       console.log(`Closed peer connection for ${peerId}`);
     }

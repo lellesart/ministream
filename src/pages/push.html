@@ -9,8 +9,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/src/css/design-system.css">
   
-  <!-- MediaPipe for AI Background Removal -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
   <style>
     .video-container {
       position: relative;
@@ -170,22 +168,17 @@
               </label>
             </div>
 
-            <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-subtle);">
-              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; font-weight: 500; cursor: pointer;">
-                <input type="checkbox" id="aiBackgroundToggle"> Remover Fundo por Inteligência Artificial
-              </label>
-              <p class="caption" style="margin-left: 1.5rem;">Utiliza a webcam para recortar você sem precisar de tela verde. Na primeira vez, baixará ~3MB da IA do Google.</p>
-              <div id="customBgContainer" style="display: none; margin-left: 1.5rem; margin-top: 0.5rem;">
-                <label style="font-size: 0.875rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Adicionar novo fundo (Imagem)</label>
-                <input type="file" id="customBgInput" accept="image/*" style="font-size: 0.75rem; color: var(--text-muted);">
-              </div>
-            </div>
+
 
             <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-subtle);">
               <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; font-weight: 500; cursor: pointer;">
                 <input type="checkbox" id="chromaToggle"> Chroma Key (Tela Verde/Azul)
               </label>
               <div id="chromaControls" style="display: none; flex-direction: column; gap: 1rem; margin-top: 1rem; margin-left: 1.5rem;">
+                <div id="customBgContainer" style="display: none; margin-bottom: 0.5rem;">
+                  <label style="font-size: 0.875rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Adicionar novo fundo (Imagem)</label>
+                  <input type="file" id="customBgInput" accept="image/*" style="font-size: 0.75rem; color: var(--text-muted);">
+                </div>
                 <div class="input-group" style="margin-bottom: 0;">
                   <label>Cor a ser removida</label>
                   <input type="color" id="chromaColor" value="#00ff00" style="width: 100%; height: 40px; background: none; border: none; cursor: pointer; padding: 0;">
@@ -590,7 +583,6 @@
     const contrastSlider = document.getElementById('contrastSlider');
     const blurSlider = document.getElementById('blurSlider');
     const mirrorToggle = document.getElementById('mirrorToggle');
-    const aiBackgroundToggle = document.getElementById('aiBackgroundToggle');
     const customBgContainer = document.getElementById('customBgContainer');
     const customBgInput = document.getElementById('customBgInput');
     const chromaToggle = document.getElementById('chromaToggle');
@@ -616,16 +608,6 @@
       }
     });
 
-    // AI Loading Overlay
-    window.addEventListener('ai-loading-start', () => {
-      videoOverlay.classList.remove('hidden');
-      videoOverlayIcon.innerHTML = '<div class="loader"></div>';
-      videoOverlayText.textContent = 'Carregando filtro de IA...';
-    });
-
-    window.addEventListener('ai-loading-end', () => {
-      videoOverlay.classList.add('hidden');
-    });
 
     // We should hide the overlay when camera actually starts
     const originalHandleNewStream = mediaManager.handleNewStream.bind(mediaManager);
@@ -658,15 +640,6 @@
       mediaManager.videoProcessor.updateConfig({ mirror: e.target.checked });
     });
 
-    aiBackgroundToggle.addEventListener('change', (e) => {
-      mediaManager.videoProcessor.updateConfig({ aiBackground: e.target.checked });
-      customBgContainer.style.display = e.target.checked ? 'block' : 'none';
-      if(e.target.checked) {
-        chromaToggle.checked = false;
-        chromaControls.style.display = 'none';
-        mediaManager.videoProcessor.updateConfig({ chromaKey: { ...mediaManager.videoProcessor.config.chromaKey, enabled: false } });
-      }
-    });
 
     customBgInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
@@ -678,11 +651,6 @@
       mediaManager.videoProcessor.updateConfig({ chromaKey: { ...mediaManager.videoProcessor.config.chromaKey, enabled: e.target.checked } });
       // If we enable chroma, we can also show the custom bg container
       customBgContainer.style.display = e.target.checked ? 'block' : 'none';
-      
-      if(e.target.checked) {
-        aiBackgroundToggle.checked = false;
-        mediaManager.videoProcessor.updateConfig({ aiBackground: false });
-      }
     });
 
     chromaColor.addEventListener('input', (e) => {

@@ -30,7 +30,43 @@
       display: flex;
       flex-direction: column;
       padding: 0;
+      max-width: 100% !important; /* Ensure it overrides design-system.css completely */
+      width: 100%;
+      height: 100%;
+    }
+
+    .video-grid {
+      display: grid;
+      width: 100%;
+      height: 100%;
+      gap: 1rem;
+      padding: 1rem;
+      box-sizing: border-box;
+      place-items: stretch;
+    }
+    
+    body.obs-mode .video-grid {
+      padding: 0;
+      gap: 0;
+    }
+
+    /* Dynamic Grid Layouts */
+    .video-grid[data-count="1"] { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+    .video-grid[data-count="2"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; }
+    .video-grid[data-count="3"], .video-grid[data-count="4"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+    .video-grid[data-count="5"], .video-grid[data-count="6"] { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr; }
+
+    .video-grid .video-wrapper {
+      width: 100%;
+      height: 100%;
+      aspect-ratio: auto;
+      flex: none;
       max-width: none;
+    }
+
+    body.obs-mode .video-grid .video-wrapper {
+      border-radius: 0;
+      border: none;
     }
 
     video { 
@@ -38,6 +74,10 @@
       height: 100%;
       object-fit: contain;
       background: transparent; 
+    }
+
+    body.fit-cover video {
+      object-fit: cover;
     }
 
     .overlay {
@@ -73,14 +113,25 @@
     const roomId = urlParams.get('room');
     const isObsMode = urlParams.has('obs');
     const bufferParam = urlParams.get('buffer');
+    const fitParam = urlParams.get('fit');
 
     if (isObsMode) {
       document.body.classList.add('obs-mode');
       document.querySelector('.container').style.padding = '0'; // Remove padding for OBS
+      if (fitParam !== 'contain') {
+        document.body.classList.add('fit-cover'); // Default to cover in OBS mode
+      }
+    } else if (fitParam === 'cover') {
+      document.body.classList.add('fit-cover');
     }
 
     const gridContainer = document.getElementById('gridContainer');
     const statusOverlay = document.getElementById('statusOverlay');
+    
+    function updateGridCount() {
+      const count = gridContainer.querySelectorAll('.video-wrapper').length;
+      gridContainer.setAttribute('data-count', count);
+    }
 
     if (!roomId) {
       statusOverlay.textContent = 'Erro: Nenhum ID de sala fornecido';
@@ -111,6 +162,7 @@
           wrapper.appendChild(video);
           wrapper.appendChild(label);
           gridContainer.appendChild(wrapper);
+          updateGridCount();
         }
         return document.getElementById(`video-${peerId}`);
       }
@@ -132,6 +184,7 @@
         const wrapper = document.getElementById(`wrapper-${peerId}`);
         if (wrapper) {
           wrapper.remove();
+          updateGridCount();
         }
       });
 

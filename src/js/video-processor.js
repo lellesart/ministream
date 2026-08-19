@@ -18,27 +18,16 @@ export class VideoProcessor {
         similarity: 0.1, // 0 to 1
         smoothness: 0.1 // 0 to 1
       },
-      aiBackground: false,
       mirror: false
     };
 
     this.stream = null;
     this.processedStream = null;
     this.animationId = null;
-
-    // AI Variables
-    this.segmentationModel = null;
-    this.segmentationMask = null;
-    this.isAiInitializing = false;
   }
 
   updateConfig(newConfig) {
     this.config = { ...this.config, ...newConfig };
-    
-    // Handle AI initialization
-    if (this.config.aiBackground && !this.segmentationModel && !this.isAiInitializing) {
-      this.initAI();
-    }
   }
 
   setChromaColor(hexColor) {
@@ -46,46 +35,6 @@ export class VideoProcessor {
     const g = parseInt(hexColor.slice(3, 5), 16);
     const b = parseInt(hexColor.slice(5, 7), 16);
     this.config.chromaKey.color = { r, g, b };
-  }
-
-  async initAI() {
-    if (typeof window.SelfieSegmentation === 'undefined') {
-      console.warn("MediaPipe SelfieSegmentation library not loaded yet.");
-      return;
-    }
-
-    this.isAiInitializing = true;
-    window.dispatchEvent(new CustomEvent('ai-loading-start'));
-    
-    this.segmentationModel = new window.SelfieSegmentation({
-      locateFile: (file) => {
-        return `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`;
-      }
-    });
-
-    this.segmentationModel.setOptions({
-      modelSelection: 1, // 0 for general, 1 for landscape (faster)
-    });
-
-    this.segmentationModel.onResults((results) => {
-      this.segmentationMask = results.segmentationMask;
-      if (this.isAiInitializing) {
-        this.isAiInitializing = false;
-        window.dispatchEvent(new CustomEvent('ai-loading-end'));
-      }
-    });
-
-    // Force model to load by sending a blank frame
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = 64;
-    tempCanvas.height = 64;
-    try {
-      await this.segmentationModel.send({ image: tempCanvas });
-    } catch (e) {
-      console.error("Error initializing AI", e);
-      this.isAiInitializing = false;
-      window.dispatchEvent(new CustomEvent('ai-loading-end'));
-    }
   }
 
   processStream(rawStream) {
@@ -122,12 +71,6 @@ export class VideoProcessor {
       this.video.srcObject = null;
     }
     this.stream = null;
-  }
-
-  async processAIFrame() {
-    if (this.segmentationModel && this.video.readyState >= 2) {
-      await this.segmentationModel.send({ image: this.video });
-    }
   }
 
   applyChromaKey(imageData) {
@@ -171,12 +114,7 @@ export class VideoProcessor {
     const width = this.canvas.width;
     const height = this.canvas.height;
 
-    // AI Segmentation processing (async)
-    if (this.config.aiBackground && this.segmentationModel) {
-      await this.processAIFrame();
-    }
-
-    // Prepare offscreen composition if we have AI
+    // Prepare offscreen composition
     this.ctx.clearRect(0, 0, width, height);
     this.ctx.save();
     
@@ -202,23 +140,17 @@ export class VideoProcessor {
     // Remove Filter
     this.ctx.filter = 'none';
 
-    // If AI Background, mask it
-    if (this.config.aiBackground && this.segmentationMask) {
-      this.ctx.globalCompositeOperation = 'destination-in';
-      this.ctx.drawImage(this.segmentationMask, 0, 0, width, height);
-    }
-
     this.ctx.restore(); // Restore removes mirror, zoom, and any stray filter
 
     // Chroma Key
-    if (this.config.chromaKey.enabled && !this.config.aiBackground) {
+    if (this.config.chromaKey.enabled) {
       const imageData = this.ctx.getImageData(0, 0, width, height);
       const processedData = this.applyChromaKey(imageData);
       this.ctx.putImageData(processedData, 0, 0);
     }
 
     // Custom Background (draw behind everything)
-    if (this.config.customBgImage && (this.config.aiBackground || this.config.chromaKey.enabled)) {
+    if (this.config.customBgImage && this.config.chromaKey.enabled) {
       this.ctx.globalCompositeOperation = 'destination-over';
       // Draw background covering the canvas (cover logic)
       const imgAspectRatio = this.config.customBgImage.width / this.config.customBgImage.height;
